@@ -100,3 +100,4 @@ if __name__ == '__main__':
     # result.get()
     p.close()
     p.join()
+    logger.info(f'Finished at {datetime.datetime.now()}')
