@@ -15,7 +15,6 @@ def get_and_store_news(ticker):
     """
     Obtaines news for the 'ticker' and save to MongoDB
     """
-    info('get_and_store_function')
     logger.info(f'==========WORKING==========> {ticker}')
     client = pm.MongoClient('mongodb://localhost:27017')
     collection = client['news']['recommendations']
@@ -26,18 +25,20 @@ def get_and_store_news(ticker):
     html = BeautifulSoup(response, 'html.parser')
     news_table = html.find(id='news-table')
 
+    saved_news_counter = 0
+
     for x in news_table.findAll('tr'):
 
         title = x.a.get_text() 
         link = x.a['href']
 
         # check if this url was scraped already
-        logger.info(f'Checking url: {link}')
+        logger.debug(f'Checking url: {link}')
         if collection.find_one({'news.url':link}): 
-            logger.info('URL has been found, continue to the next one.')
+            logger.debug('URL has been found, continue to the next one.')
             continue
         else:
-            logger.info('URL not found. Trying to download and process article.')
+            logger.debug('URL not found. Trying to download and process article.')
         
         date_scrape = x.td.text.strip().split()
 
@@ -54,10 +55,12 @@ def get_and_store_news(ticker):
             dt = 'NaN'
 
         try:
+            logger.debug(f'Downloading and processing {link}')
             article = Article(link)
             article.download()
             article.parse()
             article.nlp()
+            logger.debug(f'Downloaded {article.title} | {link}')
         except:
             continue
         
@@ -77,27 +80,33 @@ def get_and_store_news(ticker):
             {'$addToSet': doc},
             upsert = True
         )
+
+        saved_news_counter += 1
         
-        logger.info(f"Saved {ticker}: {dt}/ {doc['news']['title']}")
+        logger.debug(f"Saved {ticker}: {dt}/ {doc['news']['title']}")
+    
+    logger.info(f'{ticker}: scraped and saved {saved_news_counter} new articles')
+
+    # return saved_news_counter
         
 logging.basicConfig(level=logging.INFO)
 
 import os
 
-def info(title):
-    logger.info(title)
-    logger.info(f'module name: {__name__}')
-    logger.info(f'parent process: {os.getppid()}')
-    logger.info(f'process id:, {os.getpid()}')
+# def info(title):
+#     logger.info(title)
+#     logger.info(f'module name: {__name__}')
+#     logger.info(f'parent process: {os.getppid()}')
+#     logger.info(f'process id:, {os.getpid()}')
 
 if __name__ == '__main__': 
     
-    info('Main line')
+    logger.info(f'Starting news collector at {datetime.now()}')
     tickers = si.tickers_sp500()
+    # tickers= ['AAPL','MSFT']
     
     p = Pool()
     result = p.map_async(get_and_store_news, tickers)
-    # result.get()
     p.close()
     p.join()
-    logger.info(f'Finished at {datetime.datetime.now()}')
+    logger.info(f'Finished at {datetime.now()}')
