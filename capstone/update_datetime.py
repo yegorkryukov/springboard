@@ -58,8 +58,8 @@ collection = client['news']['recommendations']
 if __name__ == '__main__': 
     
     logger.info(f'Starting updating datetime at {datetime.now()}')
-    # tickers = si.tickers_sp500()
-    tickers= ['MSFT']
+    tickers = si.tickers_sp500()
+    # tickers= ['MSFT']
     
     p = Pool()
     result = p.map_async(update_datetime, tickers)
