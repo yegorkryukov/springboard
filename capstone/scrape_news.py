@@ -1,4 +1,5 @@
 import pymongo as pm
+import pandas as pd
 import requests
 from multiprocessing import Pool
 import logging
@@ -50,9 +51,9 @@ def get_and_store_news(ticker):
             time = date_scrape[1]
         
         try:
-            dt = date + ' ' + time
+            temp_dt = date + ' ' + time
         except:
-            dt = 'NaN'
+            temp_dt = 'NaN'
 
         try:
             logger.debug(f'Downloading and processing {link}')
@@ -63,6 +64,11 @@ def get_and_store_news(ticker):
             logger.debug(f'Downloaded {article.title} | {link}')
         except:
             continue
+
+        if pd.isnull(pd.to_datetime(temp_dt)):
+            dt = pd.to_datetime(article.publish_date)
+        else:
+            dt = pd.to_datetime(temp_dt)
         
         doc = {
             'news' : {
