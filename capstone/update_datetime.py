@@ -50,7 +50,7 @@ def update_datetime(t):
 
 
 logger = logging.getLogger(__name__)        
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 client = pm.MongoClient('mongodb://localhost:27017')
 collection = client['news']['recommendations']
