@@ -102,8 +102,9 @@ if __name__ == '__main__':
             # break
         else:
             to_process_urls.remove(url)
+            pd.DataFrame({'url':to_process_urls}).to_csv('media/usanews_2015_2020.csv')
     
-    pd.DataFrame({'url':to_process_urls}).to_csv('media/usanews_2015_2020.csv')
+    
 
     # count urls in db again
     saved_urls = [
