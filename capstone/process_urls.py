@@ -12,28 +12,27 @@ def scrape(url):
     
     """
     logging.info(f"Processing {url}")
+
+    g = Goose()
+    
+    headers = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:79.0) Gecko/20100101 Firefox/79.0"}
+    cookies = {"cookie":"prov=f155b877-1d05-46c0-e4c8-06710700ab38; _ga=GA1.2.517998572.1588979467; __gads=ID=dff7ccb26af6d704:T=1588979467:S=ALNI_MYjeHrNVGWFTWjnWwl91eovS3W_MQ; __qca=P0-1509564436-1588979467447; _gid=GA1.2.1286355178.1593617896; _gat=1"}
+
+
     
     try:
-        article = Article(url)
-        article.download()
-        # the below method may only extract a snippet... 
-        # check the database for results of text extraction
-        # and apply additional processing if needed after 
-        # article has been stored in the DB
-        # see code below Newrepublic for example
-        article.parse()
-        article.nlp()
+        url_get = requests.get(url, cookies=cookies, headers=headers)
+        article = g.extract(raw_html=url_get.text)
         
         collection.update_one(
         {'url' : url},
         {'$set':
                 {
-                    # 'html'     : article.html,
                     'date'     : article.publish_date,
                     'title'    : article.title,
-                    'text'     : article.text,
-                    'keywords' : article.keywords,
-                    'summary'  : article.summary
+                    'text'     : article.cleaned_text,
+                    'keywords' : article.meta_keywords,
+                    'summary'  : article.meta_description
                 }
         },
             upsert=True
@@ -46,10 +45,12 @@ def scrape(url):
 
 import pymongo as pm
 import pandas as pd
-from newspaper import Article
 import logging
 from multiprocessing import Pool
 import datetime
+from goose3 import Goose
+import requests
+
 
 # Start MongoDB
 # !brew services start mongodb-community@4.2
