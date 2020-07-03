@@ -1,4 +1,4 @@
-def get_text_from_url(url):
+def get_html_from_url(url):
     """Returns html content of the page at url 
     """
     import requests
@@ -30,7 +30,7 @@ def get_urls_finviz(ticker):
 
     url = 'https://finviz.com/quote.ashx?t=' + str(ticker)
 
-    result = get_text_from_url(url)
+    result = get_html_from_url(url)
 
     if result:
         html = BeautifulSoup(result, 'html.parser')
