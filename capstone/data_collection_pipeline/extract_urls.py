@@ -42,10 +42,81 @@ def get_urls_finwiz(ticker):
     logging.info(f'No URLs found at finviz.com for {ticker}')
     return False
             
+def save_urls_to_db(urls, ticker=''):
+    """Saves urls to MongoDB checking for duplicates
+    """
+    import pymongo as pm
+    import pandas as pd
+    import logging
+
+    client = pm.MongoClient('mongodb://localhost:27017')
+
+    if  ticker and urls:
+        DB_NAME = 'news'
+        COLLECTION_NAME = 'recommendations'
+        db = client[DB_NAME]
+        c = db[COLLECTION_NAME]
+        
+        processed_urls = c.find_one(
+            {'ticker':ticker},
+            {'news.url':1, '_id':0}
+        )
+        
+        if len(processed_urls) > 0:
+            processed_urls = [
+                _['url'] for _ 
+                in processed_urls['news']
+            ]
+            to_process_urls = [
+                _ for _ 
+                in urls 
+                if _ not in processed_urls
+            ]
+        else: to_process_urls = urls
+
+        # $addToSet operator adds a value to an array 
+        # unless the value is already present
+        # $each modifier allows the $addToSet operator 
+        # to add multiple values to the array 
+        c.update_one(
+            {'ticker' : ticker},
+            {'$addToSet': 
+                {'urls_to_process' : 
+                    { '$each': to_process_urls}
+                }
+            },
+            upsert = True
+        )
+
+        logging.info(f'Saved <= {len(to_process_urls)} new urls for {ticker}')
+    # else:
+        # collection = client['news']['not_processed']
+        # check for duplicates
+        
+        # save to news.not_processed collection
 
 
-ticker = 'A'
-print(get_urls_finwiz(ticker))
+if __name__ == '__main__': 
+    import logging
+    import datetime
+
+    logger = logging.getLogger()
+    handler = logging.FileHandler('logs/extract_urls.log')
+    formatter = logging.Formatter(
+            '%(asctime)s| %(levelname)s| %(message)s')
+    handler.setFormatter(formatter)
+    if not len(logger.handlers): 
+        logger.addHandler(handler)
+
+    logger.setLevel(logging.INFO)
+    logging.info(f'Starting url extraction at {datetime.datetime.now()}')
+
+    ticker = 'A'
+    urls = get_urls_finwiz(ticker)
+    if urls: 
+        save_urls_to_db(urls, ticker=ticker)
+    
+    logging.info('Extraction finished')
 
 
 
