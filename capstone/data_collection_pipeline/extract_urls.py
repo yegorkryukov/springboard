@@ -87,7 +87,8 @@ def get_urls_yahoo(ticker):
             logging.info(f'{ticker} found {len(items_list)} urls so far')
 
         for item in items_list:
-            urls_list.add(item.get_attribute('href'))
+            if not ('gemini' in item.get_attribute('href')):
+                urls_list.add(item.get_attribute('href'))
 
         logging.info(f'Found {len(urls_list)} urls for {ticker}')
     except Exception as e:
@@ -99,7 +100,7 @@ def get_urls_yahoo(ticker):
     logging.info(f'No URLs found at finance.yahoo.com for {ticker}')
     return False
 
-def get_urls_reddit(start_date='', subreddits=[]):
+def get_urls_reddit(start_date='', subreddits=[], stop_urls=[]):
     """Obtain latest news urls from reddit `subreddits`
 
     Parameters
@@ -107,6 +108,7 @@ def get_urls_reddit(start_date='', subreddits=[]):
     start_date :  str, default '', format 'YYYY-MM-DD' date from to collect the news
                     if no start_date provided, getting the news for the last 24 hours
     subreddits: list, default [], if empty getting the news from `usanews` subreddit
+    NOT IMPLEMENTED stop_urls: list of str, default [], domains to exclude from results, partial match
 
     Output
     ------
@@ -227,7 +229,6 @@ def save_urls_to_db(urls, ticker=''):
         c = db[COLLECTION_NAME]
 
         for url in urls:
-            print(url)
             c.update_one(
                 {'url': url}, 
                 {'$set': {'url': url}},
@@ -243,7 +244,8 @@ def save_urls_to_db(urls, ticker=''):
 
 if __name__ == '__main__': 
     import logging
-    import datetime
+    import datetime as dt
+    from yahoo_fin import stock_info as si 
 
     logger = logging.getLogger()
     handler = logging.FileHandler('logs/extract_urls.log')
@@ -256,16 +258,22 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     logging.info(f'Starting URL extraction')
 
-    urls_reddit = get_urls_reddit()
+    # stop_urls =[
+    #     'youtu.be',
+    #     'youtube.com',
+    #     'instagram.com'
+    # ]
+
+    start_date = (dt.datetime.today()-dt.timedelta(7)).strftime('%Y-%m-%d')
+    urls_reddit = get_urls_reddit(start_date=start_date)
     if urls_reddit: save_urls_to_db(urls_reddit)
 
-    # tickers = ['A']
-    # for ticker in tickers:
-    #     urls_finviz = get_urls_finviz(ticker)
-    #     if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
+    for ticker in si.tickers_sp500():
+        urls_finviz = get_urls_finviz(ticker)
+        if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
 
-    #     urls_yahoo = get_urls_yahoo(ticker)
-    #     if urls_yahoo: save_urls_to_db(urls_yahoo, ticker=ticker)
+        urls_yahoo = get_urls_yahoo(ticker)
+        if urls_yahoo: save_urls_to_db(urls_yahoo, ticker=ticker)
 
     logging.info('Extraction finished')
 
