@@ -13,7 +13,7 @@ def get_html_from_url(url):
     return False
 
 def get_urls_finviz(ticker):
-    """Obtain latest news for `ticker` from finviz.com
+    """Obtain latest news urls for `ticker` from finviz.com
 
     Parameters
     ----------
@@ -43,7 +43,7 @@ def get_urls_finviz(ticker):
     return False
 
 def get_urls_yahoo(ticker):
-    """Obtain latest news for `ticker` from finance.yahoo.com
+    """Obtain latest news urls for `ticker` from finance.yahoo.com
 
     Parameters
     ----------
@@ -57,6 +57,8 @@ def get_urls_yahoo(ticker):
     import time
     from random import randint
     from selenium.webdriver.firefox.options import Options
+
+    logging.info(f'Getting finance.yahoo.com news urls for {ticker}')
 
     js = """var scrollingElement = (document.scrollingElement || document.body);
                     scrollingElement.scrollTop = scrollingElement.scrollHeight;"""
@@ -97,6 +99,51 @@ def get_urls_yahoo(ticker):
     logging.info(f'No URLs found at finance.yahoo.com for {ticker}')
     return False
 
+def get_urls_reddit(start_date='', subreddits=[]):
+    """Obtain latest news urls from reddit `subreddits`
+
+    Parameters
+    ----------
+    start_date :  str, default '', format 'YYYY-MM-DD' date from to collect the news
+                    if no start_date provided, getting the news for the last 24 hours
+    subreddits: list, default [], if empty getting the news from `usanews` subreddit
+
+    Output
+    ------
+    urls   : list, list of urls
+    """
+    import datetime as dt
+    from dateutil import parser
+    from psaw import PushshiftAPI
+    import pandas as pd
+
+    api = PushshiftAPI()
+
+    if start_date:
+        start_date = int(parser.parse(start_date).timestamp())
+    else:
+        start_date = int((dt.datetime.today()-dt.timedelta(1)).timestamp())
+
+    if not subreddits:
+        subreddits = ['usanews']
+
+    urls = set()
+    for subreddit in subreddits:
+        logging.info(f'Starting URLs collection for sub {subreddit} from {dt.datetime.fromtimestamp(start_date)}')
+        data = pd.DataFrame(
+            api.search_submissions(
+                after=start_date,
+                subreddit=subreddit,
+                filter=['url']))
+        if len(data) > 0: urls |= set(data.url)
+    
+    if len(urls) > 0: 
+        logging.info(f'Found {len(urls)} urls')
+        return list(urls)
+    
+    logging.info('No urls found')
+    return False
+
 def save_urls_to_db(urls, ticker=''):
     """Saves urls to MongoDB checking for duplicates
     """
@@ -104,11 +151,12 @@ def save_urls_to_db(urls, ticker=''):
     import pandas as pd
     import logging
 
-    logging.info(f'Got {len(urls)} URLs to save for ticker {ticker}')
+    logging.info(f'Got {len(urls)} URLs to save')
 
     client = pm.MongoClient('mongodb://localhost:27017')
 
     if  ticker and urls:
+        logging.info(f'Saving for ticker {ticker}')
         DB_NAME = 'news'
         COLLECTION_NAME = 'recommendations'
         db = client[DB_NAME]
@@ -157,14 +205,40 @@ def save_urls_to_db(urls, ticker=''):
             upsert = True
         )
 
+        qty_stored_to_process_after = c.find_one(
+            {'ticker':ticker},
+            {'urls_to_process':1, '_id':0}
+        )
 
+        if len(qty_stored_to_process_after) > 0:
+            qty_stored_to_process_after = len([
+                _ for _ 
+                in qty_stored_to_process_after['urls_to_process']
+            ])
+        else: qty_stored_to_process_after = 0
 
-        logging.info(f'Saved {len(to_process_urls) - qty_stored_to_process_before} new urls for {ticker}')
-    # else:
-        # collection = client['news']['not_processed']
-        # check for duplicates
-        
-        # save to news.not_processed collection
+        logging.info(f'Saved {qty_stored_to_process_after - qty_stored_to_process_before} new urls for {ticker}')
+        return
+    
+    if urls:
+        DB_NAME = 'news'
+        COLLECTION_NAME = 'urls_to_process'
+        db = client[DB_NAME]
+        c = db[COLLECTION_NAME]
+
+        for url in urls:
+            print(url)
+            c.update_one(
+                {'url': url}, 
+                {'$set': {'url': url}},
+                upsert=True
+            )
+
+        logging.info(f'Saved to {COLLECTION_NAME}')
+        return
+    
+    logging.info('0 URLs saved. No ticker and no URLs provided.')
+    return False
 
 
 if __name__ == '__main__': 
@@ -182,15 +256,16 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     logging.info(f'Starting URL extraction')
 
-    tickers = ['A']
-    for ticker in tickers:
-        urls_finviz = get_urls_finviz(ticker)
-        print(urls_finviz)
-        if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
+    urls_reddit = get_urls_reddit()
+    if urls_reddit: save_urls_to_db(urls_reddit)
 
-        # urls_yahoo = get_urls_yahoo(ticker)
-        # if urls_yahoo: save_urls_to_db(urls_yahoo, ticker=ticker)
+    # tickers = ['A']
+    # for ticker in tickers:
+    #     urls_finviz = get_urls_finviz(ticker)
+    #     if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
 
+    #     urls_yahoo = get_urls_yahoo(ticker)
+    #     if urls_yahoo: save_urls_to_db(urls_yahoo, ticker=ticker)
 
     logging.info('Extraction finished')
 
