@@ -12,8 +12,8 @@ def get_text_from_url(url):
     logging.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
     return False
 
-def get_urls_finwiz(ticker):
-    """Obtain latest news for `ticker` from finwiz.com
+def get_urls_finviz(ticker):
+    """Obtain latest news for `ticker` from finviz.com
 
     Parameters
     ----------
@@ -26,7 +26,7 @@ def get_urls_finwiz(ticker):
     import logging
     from bs4 import BeautifulSoup
 
-    logging.info(f'Getting finwiz.com news urls for {ticker}')
+    logging.info(f'Getting finviz.com news urls for {ticker}')
 
     url = 'https://finviz.com/quote.ashx?t=' + str(ticker)
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     logging.info(f'Starting url extraction at {datetime.datetime.now()}')
 
     ticker = 'A'
-    urls = get_urls_finwiz(ticker)
+    urls = get_urls_finviz(ticker)
     if urls: 
         save_urls_to_db(urls, ticker=ticker)
     
