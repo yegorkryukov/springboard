@@ -13,7 +13,8 @@ def detect_and_move(ticker):
     source_collection = client['news']['not_processed']
     target_collection = client['news']['recommendations']
 
-    source_doc = source_collection.find_one({'$text': {'$search': ticker}})
+    source_doc = source_collection.find_one(
+        {'$text': {'$search': ticker, '$caseSensitive': True}})
 
     if source_doc and ('text' in source_doc.keys()):
         logging.info(f"{ticker}: found document. _id: {source_doc['_id']}")
@@ -57,6 +58,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     logging.info(f'Starting URL processing')
 
+    # FIX LOGIC FOR ADS TICKER OR 
     for ticker in si.tickers_sp500():
         moving = True
         while moving:
