@@ -14,7 +14,7 @@ def detect_and_move(ticker):
     target_collection = client['news']['recommendations']
 
     source_doc = source_collection.find_one({'$text': {'$search': ticker}})
-    
+
     if source_doc and ('text' in source_doc.keys()):
         logging.info(f"{ticker}: found document. _id: {source_doc['_id']}")
 
@@ -57,9 +57,9 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     logging.info(f'Starting URL processing')
 
-    ticker = 'AAPL'
-    moving = True
-    while moving:
-        moving = detect_and_move(ticker)
+    for ticker in si.tickers_sp500():
+        moving = True
+        while moving:
+            moving = detect_and_move(ticker)
 
     logging.info(f'URL processing ended')
