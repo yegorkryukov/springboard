@@ -14,9 +14,10 @@ def detect_and_move(ticker):
     target_collection = client['news']['recommendations']
 
     source_doc = source_collection.find_one({'$text': {'$search': ticker}})
-    logging.info(f"{ticker}: found document. _id: {source_doc['_id']}")
+    
+    if source_doc and ('text' in source_doc.keys()):
+        logging.info(f"{ticker}: found document. _id: {source_doc['_id']}")
 
-    if 'text' in source_doc.keys():
         target_collection.update_one(
             {'ticker' : ticker},
             {'$addToSet':
@@ -38,7 +39,7 @@ def detect_and_move(ticker):
         logging.info(f"Deleted article {ObjectId(source_doc['_id'])} from {source_collection.name}")
         return True
     else:
-        print('need to finish')
+        logging.info(f"{ticker}: no docs found in {source_collection.name}")
         return False
 
 if __name__ == '__main__': 
@@ -57,6 +58,8 @@ if __name__ == '__main__':
     logging.info(f'Starting URL processing')
 
     ticker = 'AAPL'
-    detect_and_move(ticker)
+    moving = True
+    while moving:
+        moving = detect_and_move(ticker)
 
     logging.info(f'URL processing ended')
