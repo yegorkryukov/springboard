@@ -6,11 +6,16 @@ def get_html_from_url(url):
     headers = {"User-Agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:79.0) Gecko/20100101 Firefox/79.0"}
     requests.adapters.DEFAULT_RETRIES = 1
 
-    url_get = requests.get(url, headers=headers, timeout=3)
-    if url_get.status_code == 200:
-        return url_get.text
-    logging.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
-    return False
+    try:
+        url_get = requests.get(url, headers=headers, timeout=3)
+        if url_get.status_code == 200:
+            return url_get.text
+        else:
+            logging.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
+            return False
+    except Exception as e:
+        logging.info(f'Cannot get html for {url}. Error: {e}')
+        return False
 
 def get_urls_finviz(ticker):
     """Obtain latest news urls for `ticker` from finviz.com
@@ -268,7 +273,13 @@ if __name__ == '__main__':
     urls_reddit = get_urls_reddit(start_date=start_date)
     if urls_reddit: save_urls_to_db(urls_reddit)
 
-    for ticker in si.tickers_sp500():
+    ########################################
+    #!!!!!!!!!!!!!!!!!!
+    # DELETE [98:] IN THE LINE BELOW 
+    # AFTER JULY 4
+    ########################################
+
+    for ticker in si.tickers_sp500()[391:]:
         urls_finviz = get_urls_finviz(ticker)
         if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
 
