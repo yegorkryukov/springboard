@@ -1,5 +1,16 @@
+.DS_Store
+
 *.csv
 *.json
 *.zip
+
 .vscode
+*.log
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Scrapy stuff:
+.scrapy
+
 
