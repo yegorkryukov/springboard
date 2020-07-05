@@ -73,7 +73,7 @@ import requests
 
 if __name__ == '__main__': 
     logger = logging.getLogger()
-    handler = logging.FileHandler('content_extraction.log')
+    handler = logging.FileHandler('logs/content_extraction.log')
     formatter = logging.Formatter(
             '%(asctime)s| %(levelname)s| %(message)s')
     handler.setFormatter(formatter)
@@ -95,16 +95,13 @@ if __name__ == '__main__':
     logging.info(f'URL in CSV: {len(to_process_urls)}')
 
     for url in to_process_urls:
-        if url not in saved_urls: 
-            if not scrape(url):
-                # remove urls that can't be processed
-                to_process_urls.remove(url)
-            # break
+        if url not in saved_urls:
+            scrape(url)
+            to_process_urls.remove(url)
         else:
             to_process_urls.remove(url)
-            pd.DataFrame({'url':to_process_urls}).to_csv('media/usanews_2015_2020.csv')
     
-    
+    pd.DataFrame({'url':to_process_urls}).to_csv('media/usanews_2015_2020.csv')
 
     # count urls in db again
     saved_urls = [
