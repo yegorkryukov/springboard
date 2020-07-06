@@ -146,7 +146,6 @@ def scrape_urls(ticker):
             logging.info(f'Deleted from DB URL {url}')
 
             scraped += 1
-            break # for testing
         else:
             logging.info(f'Did not get the text for {url}')
     
@@ -171,14 +170,16 @@ def setup_logging():
 
 if __name__ == '__main__': 
     from yahoo_fin import stock_info as si 
-    # from multiprocessing import Pool
+    from multiprocessing import Pool
     import logging
     setup_logging()
 
     logging.info('Starting text extraction')
-    
-    for ticker in si.tickers_sp500():
-        scrape_urls(ticker)
-        break # for testing
+
+    p = Pool()
+    tickers = si.tickers_sp500()
+    result = p.map_async(scrape_urls, tickers)
+    p.close()
+    p.join()
 
     logging.info(f'Finished text extraction')
