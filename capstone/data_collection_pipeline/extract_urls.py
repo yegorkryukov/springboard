@@ -273,13 +273,7 @@ if __name__ == '__main__':
     urls_reddit = get_urls_reddit(start_date=start_date)
     if urls_reddit: save_urls_to_db(urls_reddit)
 
-    ########################################
-    #!!!!!!!!!!!!!!!!!!
-    # DELETE [98:] IN THE LINE BELOW 
-    # AFTER JULY 4
-    ########################################
-
-    for ticker in si.tickers_sp500()[391:]:
+    for ticker in si.tickers_sp500():
         urls_finviz = get_urls_finviz(ticker)
         if urls_finviz: save_urls_to_db(urls_finviz, ticker=ticker)
 
