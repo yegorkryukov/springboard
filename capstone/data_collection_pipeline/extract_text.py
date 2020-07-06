@@ -12,8 +12,7 @@ def get_html_from_url(url):
     """
     import requests
     from random import randint
-    import multiprocessing
-    logger = multiprocessing.get_logger()
+    logger = create_logger()
 
     UA = [
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Safari/605.1.15',
@@ -32,6 +31,9 @@ def get_html_from_url(url):
         if url_get.status_code == 200:
             logger.info(f'Successfully got html for {url}')
             return url_get.text
+        elif url_get.status_code == 404:
+            logger.info(f'No page. Status {url_get.status_code}')
+            return 404
         else:
             logger.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
             return False
@@ -62,8 +64,7 @@ def scrape(url):
     """
     from newspaper import Article, Config
     import re
-    import multiprocessing
-    logger = multiprocessing.get_logger()
+    logger = create_logger()
 
     logger.info(f"Processing {url}")
     config = Config()
@@ -75,6 +76,8 @@ def scrape(url):
     config.number_threads = 8
 
     html = get_html_from_url(url)
+    if html == 404:
+        return 404
 
     if html and len(html)>300:
         article = Article(url=url, config=config)
@@ -96,6 +99,40 @@ def scrape(url):
         logger.info(f'Could not extract data from {url}')
         return False
 
+def delete_url(ticker, url):
+    import pymongo as pm
+    logger = create_logger()
+    client = pm.MongoClient('mongodb://localhost:27017')
+    c = client['news']['recommendations']
+
+    c.update_one(
+        {'ticker' : ticker},
+        {'$pull'  : {"urls_to_process" : url}}
+    )
+
+    logger.info(f'Deleted from DB URL {url}')
+
+def save_scraped_meta(ticker, url, doc):
+    """Saves doc to MongoDB news.recommendations.news for ticker and url
+
+    Parameters
+    ----------
+    ticker    : str, ticker
+    url       : str, url
+    doc       : dict, keys: [url, date, title, text, keywords, summary]
+    """
+    import pymongo as pm
+    logger = create_logger()
+    client = pm.MongoClient('mongodb://localhost:27017')
+    c = client['news']['recommendations']
+
+    c.update_one(
+        {'ticker'   : ticker},
+        {'$addToSet': {'news' : doc}},
+        upsert=True
+    )
+    logger.info(f"Saved title {doc['title']} for {url} to DB")
+
 def scrape_urls(ticker):
     """Processes all urls stored in MongoDB document with `ticker.not_processed` field
 
@@ -109,13 +146,11 @@ def scrape_urls(ticker):
     meta data to news.recommendations.ticker.news document.
     """
     import pymongo as pm
-    import multiprocessing
-    logger = multiprocessing.get_logger()
+    logger = create_logger()
 
     client = pm.MongoClient('mongodb://localhost:27017')
     c = client['news']['recommendations']
 
-    
     logger.info(f'Processing {ticker}')
 
     urls_to_process = c.find_one(
@@ -133,37 +168,29 @@ def scrape_urls(ticker):
     scraped = 0
     for url in urls_to_process:
         doc = scrape(url)
-        if doc:
-            c.update_one(
-                {'ticker'   : ticker},
-                {'$addToSet': {'news' : doc}},
-                upsert=True
-            )
-            logger.info(f"Saved title {doc['title']} for {url} to DB")
-
-            # deletes processed url
-            c.update_one(
-                {'ticker' : ticker},
-                {'$pull'  : {"urls_to_process" : url}}
-            )
-            logger.info(f'Deleted from DB URL {url}')
-
+        if doc == 404:
+            logger.info(f'URL {url} got 404. Deleting from DB')
+            delete_url(ticker, url)
+        elif doc:
+            save_scraped_meta(ticker, url, doc)
+            delete_url(ticker, url)
             scraped += 1
         else:
             logger.info(f'Did not get the text for {url}')
     
     logger.info(f'{ticker}: Scraped {scraped} our of {len(urls_to_process)} URLs')
 
-
-# def setup_logger():
-#     logger = logger.getLogger()
-#     handler = logger.FileHandler('logs/text_extraction.log')
-#     formatter = logger.Formatter(
-#             '%(asctime)s| %(levelname)s| %(message)s')
-#     handler.setFormatter(formatter)
-#     if not len(logger.handlers): 
-#         logger.addHandler(handler)
-#     logger.setLevel(logger.INFO)
+def create_logger():
+    import multiprocessing, logging
+    # multiprocessing.log_to_stderr()
+    logger = multiprocessing.get_logger()
+    logger.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s| %(levelname)s| %(message)s')
+    handler = logging.FileHandler('logs/multi_text_extraction.log')
+    handler.setFormatter(formatter)
+    if not len(logger.handlers): 
+        logger.addHandler(handler)
+    return logger
 
 # Start MongoDB
 # !brew services start mongodb-community@4.2
@@ -174,13 +201,7 @@ def scrape_urls(ticker):
 if __name__ == '__main__': 
     from yahoo_fin import stock_info as si 
     from multiprocessing import Pool
-    import multiprocessing, logging
-
-    multiprocessing.log_to_stderr()
-    logger = multiprocessing.get_logger()
-    logger.setLevel(logging.INFO)
-
-    # setup_logger()
+    logger = create_logger()
 
     logger.info('Starting text extraction')
 
