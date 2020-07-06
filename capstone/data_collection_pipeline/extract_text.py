@@ -11,10 +11,10 @@ def get_html_from_url(url):
     False       : bool, if get request fails
     """
     import requests
-    import logging
     from random import randint
-    from fake_useragent import UserAgent
-    # UA = UserAgent()
+    import multiprocessing
+    logger = multiprocessing.get_logger()
+
     UA = [
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1.1 Safari/605.1.15',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36',
@@ -23,20 +23,20 @@ def get_html_from_url(url):
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.157 Safari/537.36'
     ]
 
-    logging.info(f'Getting html from {url}')
+    logger.info(f'Getting html from {url}')
     headers = {"User-Agent":UA[randint(0,len(UA)-1)]}
     requests.adapters.DEFAULT_RETRIES = 1
 
     try:
         url_get = requests.get(url, headers=headers, timeout=3)
         if url_get.status_code == 200:
-            logging.info(f'Successfully got html for {url}')
+            logger.info(f'Successfully got html for {url}')
             return url_get.text
         else:
-            logging.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
+            logger.info(f'Cannot get html for {url}. Error: {url_get.status_code}')
             return False
     except Exception as e:
-        logging.info(f'Cannot get html for {url}. Error: {e}')
+        logger.info(f'Cannot get html for {url}. Error: {e}')
         return False
 
 def scrape(url):
@@ -61,10 +61,11 @@ def scrape(url):
     False       : bool, if get request fails
     """
     from newspaper import Article, Config
-    import logging
     import re
+    import multiprocessing
+    logger = multiprocessing.get_logger()
 
-    logging.info(f"Processing {url}")
+    logger.info(f"Processing {url}")
     config = Config()
     config.memoize_articles = False
     config.fetch_images = False
@@ -82,7 +83,7 @@ def scrape(url):
         article.parse()
         article.nlp()
 
-        logging.info(f'Extracted {article.title} from {url}')
+        logger.info(f'Extracted {article.title} from {url}')
         return {
             'url'      : url,
             'date'     : article.publish_date,
@@ -92,7 +93,7 @@ def scrape(url):
             'summary'  : article.summary
         }
     else:
-        logging.info(f'Could not extract data from {url}')
+        logger.info(f'Could not extract data from {url}')
         return False
 
 def scrape_urls(ticker):
@@ -108,12 +109,14 @@ def scrape_urls(ticker):
     meta data to news.recommendations.ticker.news document.
     """
     import pymongo as pm
-    import logging
+    import multiprocessing
+    logger = multiprocessing.get_logger()
 
     client = pm.MongoClient('mongodb://localhost:27017')
     c = client['news']['recommendations']
 
-    logging.info(f'Processing {ticker}')
+    
+    logger.info(f'Processing {ticker}')
 
     urls_to_process = c.find_one(
             {'ticker':ticker},
@@ -122,9 +125,9 @@ def scrape_urls(ticker):
 
     if len(urls_to_process) > 0:
         urls_to_process = urls_to_process['urls_to_process']
-        logging.info(f'Found {len(urls_to_process)} URLs to scrape')
+        logger.info(f'Found {len(urls_to_process)} URLs to scrape')
     else:
-        logging.info(f'No URLs found in {c} to process for {ticker}')
+        logger.info(f'No URLs found in {c} to process for {ticker}')
         return False
     
     scraped = 0
@@ -136,31 +139,31 @@ def scrape_urls(ticker):
                 {'$addToSet': {'news' : doc}},
                 upsert=True
             )
-            logging.info(f"Saved title {doc['title']} for {url} to DB")
+            logger.info(f"Saved title {doc['title']} for {url} to DB")
 
             # deletes processed url
             c.update_one(
                 {'ticker' : ticker},
                 {'$pull'  : {"urls_to_process" : url}}
             )
-            logging.info(f'Deleted from DB URL {url}')
+            logger.info(f'Deleted from DB URL {url}')
 
             scraped += 1
         else:
-            logging.info(f'Did not get the text for {url}')
+            logger.info(f'Did not get the text for {url}')
     
-    logging.info(f'{ticker}: Scraped {scraped} our of {len(urls_to_process)} URLs')
+    logger.info(f'{ticker}: Scraped {scraped} our of {len(urls_to_process)} URLs')
 
 
-def setup_logging():
-    logger = logging.getLogger()
-    handler = logging.FileHandler('logs/text_extraction.log')
-    formatter = logging.Formatter(
-            '%(asctime)s| %(levelname)s| %(message)s')
-    handler.setFormatter(formatter)
-    if not len(logger.handlers): 
-        logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+# def setup_logger():
+#     logger = logger.getLogger()
+#     handler = logger.FileHandler('logs/text_extraction.log')
+#     formatter = logger.Formatter(
+#             '%(asctime)s| %(levelname)s| %(message)s')
+#     handler.setFormatter(formatter)
+#     if not len(logger.handlers): 
+#         logger.addHandler(handler)
+#     logger.setLevel(logger.INFO)
 
 # Start MongoDB
 # !brew services start mongodb-community@4.2
@@ -171,10 +174,15 @@ def setup_logging():
 if __name__ == '__main__': 
     from yahoo_fin import stock_info as si 
     from multiprocessing import Pool
-    import logging
-    setup_logging()
+    import multiprocessing, logging
 
-    logging.info('Starting text extraction')
+    multiprocessing.log_to_stderr()
+    logger = multiprocessing.get_logger()
+    logger.setLevel(logging.INFO)
+
+    # setup_logger()
+
+    logger.info('Starting text extraction')
 
     p = Pool()
     tickers = si.tickers_sp500()
@@ -182,4 +190,4 @@ if __name__ == '__main__':
     p.close()
     p.join()
 
-    logging.info(f'Finished text extraction')
+    logger.info(f'Finished text extraction')
